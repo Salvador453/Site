@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Студентська платформа</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg" aria-hidden="true"></div>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand__logo" aria-hidden="true">◉</div>
+        <div class="brand__text">
+          <div class="brand__title">Студентська платформа</div>
+          <div class="brand__subtitle">Статистика, відвідуваність та успішність</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="#/" class="nav__link" data-nav>Головна</a>
+        <a href="#/кабінет" class="nav__link" data-nav>Кабінет</a>
+        <a href="#/адмін" class="nav__link nav__link--admin" data-nav>Адмін-панель</a>
+      </nav>
+
+      <div class="authbar">
+        <div id="userBadge" class="user-badge" role="status" aria-live="polite"></div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section id="app" class="app"></section>
+    </main>
+
+    <footer class="footer">
+      <div>Дані зберігаються локально у браузері (для демо/тесту без сервера).</div>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
