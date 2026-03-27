@@ -1,5 +1,7 @@
 /* eslint-disable no-inner-declarations */
 (function () {
+  console.log('app.js завантажено');
+
   const COURSES = [1, 2, 3, 4];
   const DB_KEY = "ukrEdu.db.v1";
   const SESSION_KEY = "ukrEdu.session.userId";
@@ -499,6 +501,17 @@
     const passThreshold = Number(db.settings.passThreshold ?? 60);
     const avg = grades.average;
     const passed = avg == null ? null : avg >= passThreshold;
+    
+    // Get all students on same course for ranking
+    const allStudentsOnCourse = db.users.filter(u => u.role === "student" && u.courseId === user.courseId);
+    const allGradesOnCourse = allStudentsOnCourse.map(s => ({
+      studentId: s.id,
+      fullName: getStudentFullName(s),
+      average: getGradeStats(db, s.id).average
+    })).filter(x => x.average != null).sort((a, b) => b.average - a.average);
+    
+    const userRank = allGradesOnCourse.findIndex(x => x.studentId === user.id) + 1;
+    const totalStudents = allGradesOnCourse.length;
 
     const chartItems = grades.list
       .slice()
@@ -521,7 +534,7 @@
           </div>
         </div>
 
-        <div class="grid grid--3" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div class="grid grid--4" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
           <div class="notice">
             <div class="muted" style="font-weight:800; margin-bottom:4px;">Відвідуваність</div>
             <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">${attendance.total ? `${attendance.percent}%` : "Н/Д"}</div>
@@ -533,17 +546,24 @@
               ${avg == null ? "Н/Д" : `${avg.toFixed(1)}`}
             </div>
             <div class="muted">
-              Поріг успішності: ${passThreshold}%
+              Поріг: ${passThreshold}%
             </div>
           </div>
           <div class="notice">
             <div class="muted" style="font-weight:800; margin-bottom:4px;">Статус</div>
             <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">
               ${
-                passed == null ? "—" : passed ? "Успішно" : "Потрібне покращення"
+                passed == null ? "—" : passed ? "✓ Успішно" : "⚠ Потрібна увага"
               }
             </div>
             <div class="muted">Оцінки вносяться адміном</div>
+          </div>
+          <div class="notice">
+            <div class="muted" style="font-weight:800; margin-bottom:4px;">Рейтинг у групі</div>
+            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">
+              ${totalStudents > 0 ? `${userRank}/${totalStudents}` : "Н/Д"}
+            </div>
+            <div class="muted">За середнім балом</div>
           </div>
         </div>
 
@@ -707,6 +727,7 @@
           <div class="tab" data-admin-tab="students">Студенти</div>
           <div class="tab" data-admin-tab="attendance">Відвідуваність</div>
           <div class="tab" data-admin-tab="grades">Оцінки</div>
+          <div class="tab" data-admin-tab="stats">Статистика</div>
           <div class="tab" data-admin-tab="admins">Адміни</div>
         </div>
 
@@ -912,6 +933,116 @@
                     Кабінет студента рахує середній бал та відображає останні записи.
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div data-admin-content="stats" style="display:none;">
+            <div class="section-title" style="font-size:16px;">Загальна статистика</div>
+            <div class="muted" style="margin-bottom:14px; font-size:13px;">Аналітика студентів та їхніх показників.</div>
+
+            <div class="grid grid--4" style="margin-bottom:14px;">
+              <div class="notice">
+                <div class="muted" style="font-weight:800; margin-bottom:4px;">Всього студентів</div>
+                <div style="font-weight:1000; font-size:22px;">${escapeHtml(String(allStudents.length))}</div>
+              </div>
+              <div class="notice">
+                <div class="muted" style="font-weight:800; margin-bottom:4px;">З оцінками</div>
+                <div style="font-weight:1000; font-size:22px;">${escapeHtml(String(db.grades.length > 0 ? new Set(db.grades.map(g => g.studentId)).size : 0))}</div>
+              </div>
+              <div class="notice">
+                <div class="muted" style="font-weight:800; margin-bottom:4px;">Занять записано</div>
+                <div style="font-weight:1000; font-size:22px;">${escapeHtml(String(new Set(db.attendance.map(a => a.dateISO)).size))}</div>
+              </div>
+              <div class="notice">
+                <div class="muted" style="font-weight:800; margin-bottom:4px;">Предметів</div>
+                <div style="font-weight:1000; font-size:22px;">${escapeHtml(String(db.subjects.length))}</div>
+              </div>
+            </div>
+
+            <div class="grid grid--2" style="margin-bottom:14px;">
+              <div>
+                <div class="section-title" style="font-size:16px;">Топ студентів (за середнім балом)</div>
+                <div class="tableWrap">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Місце</th>
+                        <th>ПІБ</th>
+                        <th>Курс</th>
+                        <th>Середній бал</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${
+                        allStudents.length > 0
+                          ? allStudents
+                              .map(s => ({
+                                student: s,
+                                average: getGradeStats(db, s.id).average
+                              }))
+                              .filter(x => x.average != null)
+                              .sort((a, b) => b.average - a.average)
+                              .slice(0, 10)
+                              .map((x, idx) => `
+                                <tr>
+                                  <td style="font-weight:900;">${escapeHtml(String(idx + 1))}</td>
+                                  <td>${escapeHtml(getStudentFullName(x.student))}</td>
+                                  <td>${escapeHtml(getCourseLabel(x.student.courseId))}</td>
+                                  <td><span class="pill pill--ok">${escapeHtml(x.average.toFixed(1))}</span></td>
+                                </tr>
+                              `)
+                              .join("")
+                          : `<tr><td colspan="4" class="muted">Немає даних.</td></tr>`
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <div class="section-title" style="font-size:16px;">Потребують уваги (низькі оцінки)</div>
+                <div class="tableWrap">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>ПІБ</th>
+                        <th>Курс</th>
+                        <th>Середній бал</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${
+                        allStudents.length > 0
+                          ? allStudents
+                              .map(s => ({
+                                student: s,
+                                average: getGradeStats(db, s.id).average
+                              }))
+                              .filter(x => x.average != null && x.average < passThreshold)
+                              .sort((a, b) => a.average - b.average)
+                              .slice(0, 10)
+                              .map((x) => `
+                                <tr>
+                                  <td>${escapeHtml(getStudentFullName(x.student))}</td>
+                                  <td>${escapeHtml(getCourseLabel(x.student.courseId))}</td>
+                                  <td><span class="pill pill--danger">${escapeHtml(x.average.toFixed(1))}</span></td>
+                                </tr>
+                              `)
+                              .join("")
+                          : `<tr><td colspan="3" class="muted">Немає даних.</td></tr>`
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="notice" style="margin-top:14px;">
+              <div style="font-weight:900; margin-bottom:8px;">Експорт даних</div>
+              <div class="muted" style="margin-bottom:10px;">Завантажте дані студентів та їхні оцінки у форматі CSV для аналізу.</div>
+              <div class="btnbar">
+                <button class="btn btn--primary" type="button" id="btnExportCSV">📥 Експортувати CSV</button>
               </div>
             </div>
           </div>
@@ -1354,6 +1485,49 @@
 
     // Initial render for attendance recent+form once tab opened.
     renderAttendanceRecent();
+
+    // Export CSV functionality
+    const btnExportCSV = $("#btnExportCSV");
+    if (btnExportCSV) {
+      btnExportCSV.addEventListener("click", () => {
+        const db2 = loadDB();
+        const csvRows = [];
+        
+        // Header
+        csvRows.push(["ПІБ", "Email", "Курс", "Група", "Средній бал", "Відвідуваність %", "Статус"].join(","));
+        
+        // Data rows
+        for (const student of allStudents) {
+          const gradeStats = getGradeStats(db2, student.id);
+          const attStats = getAttendanceStats(db2, student);
+          const group = getGroupForCourse(db2, student.courseId);
+          const groupName = group?.name?.trim() ? group.name.trim() : `Група ${student.courseId}`;
+          const avg = gradeStats.average;
+          const passed = avg == null ? "Н/Д" : (avg >= passThreshold ? "Успішний" : "Потребує уваги");
+          
+          csvRows.push([
+            `"${getStudentFullName(student)}"`,
+            `"${student.email}"`,
+            student.courseId,
+            `"${groupName}"`,
+            avg != null ? avg.toFixed(1) : "Н/Д",
+            attStats.total > 0 ? attStats.percent : "Н/Д",
+            passed
+          ].join(","));
+        }
+        
+        const csv = csvRows.join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `студенти_${new Date().toISOString().split("T")[0]}.csv`);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+    }
   }
 
   function renderAdminUnauthorized() {
@@ -1374,6 +1548,7 @@
   function render() {
     const db = loadDB();
     const user = getSessionUser(db);
+    console.log('render() route=', currentRoute(), 'user=', user ? user.email : null);
     setNavVisibleByRole(db, user);
     renderUserBadge(db, user);
 
