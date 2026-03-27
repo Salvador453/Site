@@ -8,6 +8,9 @@
 
   const elApp = document.getElementById("app");
   const elUserBadge = document.getElementById("userBadge");
+  const THEME_KEY = "ukrEdu.theme";
+  const SUPPORTED_THEMES = ["dark", "green", "purple", "light"];
+  const DEFAULT_THEME = "purple";
 
   const escapeHtml = (s) =>
     String(s ?? "").replace(/[&<>"']/g, (c) => {
@@ -30,6 +33,8 @@
     attendance: [], // {id, courseId, dateISO, studentId, present}
     settings: {
       passThreshold: 60,
+      telegramBotToken: "",
+      telegramChatId: "",
     },
   });
 
@@ -59,8 +64,15 @@
     if (!Array.isArray(db.subjects)) db.subjects = [];
     if (!Array.isArray(db.grades)) db.grades = [];
     if (!Array.isArray(db.attendance)) db.attendance = [];
-    if (!db.settings) db.settings = { passThreshold: 60 };
+    if (Array.isArray(db.users)) {
+      db.users.forEach((u) => {
+        if (!SUPPORTED_THEMES.includes(u.theme)) u.theme = DEFAULT_THEME;
+      });
+    }
+    if (!db.settings) db.settings = { passThreshold: 60, telegramBotToken: "", telegramChatId: "" };
     if (typeof db.settings.passThreshold !== "number") db.settings.passThreshold = 60;
+    if (typeof db.settings.telegramBotToken !== "string") db.settings.telegramBotToken = "";
+    if (typeof db.settings.telegramChatId !== "string") db.settings.telegramChatId = "";
     saveDB(db);
     return db;
   }
@@ -128,6 +140,38 @@
 
   function getStudentFullName(user) {
     return `${user.lastName} ${user.firstName}`;
+  }
+
+  function normalizeTheme(theme) {
+    return SUPPORTED_THEMES.includes(String(theme)) ? String(theme) : DEFAULT_THEME;
+  }
+
+  function applyTheme(theme) {
+    const normalized = normalizeTheme(theme);
+    document.body.classList.remove(...SUPPORTED_THEMES.map((t) => `theme-${t}`));
+    document.body.classList.add(`theme-${normalized}`);
+  }
+
+  function setPageClass(route) {
+    const pageClasses = [
+      "page-home",
+      "page-login",
+      "page-register",
+      "page-cabinet",
+      "page-admin",
+      "page-starosta",
+      "page-profile",
+    ];
+    document.body.classList.remove(...pageClasses);
+    const routeName = String(route).toLowerCase();
+    let className = "page-home";
+    if (routeName === "/вхід") className = "page-login";
+    else if (routeName === "/реєстрація") className = "page-register";
+    else if (routeName === "/кабінет") className = "page-cabinet";
+    else if (routeName === "/адмін") className = "page-admin";
+    else if (routeName === "/староста") className = "page-starosta";
+    else if (routeName === "/профіль") className = "page-profile";
+    document.body.classList.add(className);
   }
 
   function getGradeStats(db, studentId) {
@@ -221,6 +265,14 @@
 
   function setNavVisibleByRole(db, user) {
     const adminLink = document.querySelector('[data-nav].nav__link--admin');
+    const profileLink = document.querySelector('[data-nav].nav__link--profile');
+    const starostaLink = document.querySelector('[data-nav].nav__link--starosta');
+    if (profileLink) {
+      profileLink.style.display = user ? "" : "none";
+    }
+    if (starostaLink) {
+      starostaLink.style.display = user && user.role === "starosta" ? "" : "none";
+    }
     if (!adminLink) return;
     if (!user) {
       adminLink.style.display = "none";
@@ -306,12 +358,6 @@
           <button class="btn" type="button" id="btnToRegister">Реєстрація</button>
         </div>
 
-        <div class="notice" style="margin-top:14px;">
-          <div style="font-weight:900; margin-bottom:6px;">Важливо</div>
-          <div class="muted">
-            Ця версія працює як демонстрація без сервера: дані зберігаються локально у вашому браузері. Для реальної багатокористувацької системи потрібен бекенд.
-          </div>
-        </div>
       </div>
     `;
     const btnToLogin = $("#btnToLogin");
@@ -485,6 +531,7 @@
           passwordHash,
           role: isFirstAdmin ? "admin" : "student",
           courseId,
+          theme: DEFAULT_THEME,
           createdAt: new Date().toISOString(),
         });
 
@@ -674,6 +721,161 @@
     }
   }
 
+  function renderProfile(db, user) {
+    const group = getGroupForCourse(db, user.courseId);
+    const groupName = group?.name?.trim() ? group.name.trim() : `Група ${user.courseId}`;
+    const attendance = getAttendanceStats(db, user);
+    const grades = getGradeStats(db, user.id);
+    const themeOptions = SUPPORTED_THEMES.map((theme) => `
+        <option value="${theme}" ${user.theme === theme ? "selected" : ""}>${theme.charAt(0).toUpperCase() + theme.slice(1)}</option>
+      `).join("");
+
+    elApp.innerHTML = `
+      <div class="card">
+        <div class="row" style="margin-bottom:12px;">
+          <div>
+            <h2 class="section-title" style="margin:0;">Профіль</h2>
+            <div class="muted" style="margin-top:6px;">Особисті налаштування та вибір теми.</div>
+          </div>
+          <div>
+            <span class="pill pill--accent">${escapeHtml(user.role === "admin" ? "Адмін" : user.role === "starosta" ? "Староста" : "Студент")}</span>
+          </div>
+        </div>
+        <div class="grid grid--2">
+          <div>
+            <div class="notice" style="margin-bottom:14px;">
+              <div style="font-weight:900; margin-bottom:6px;">Інформація</div>
+              <div class="muted">ПІБ: ${escapeHtml(getStudentFullName(user))}</div>
+              <div class="muted">Email: ${escapeHtml(user.email)}</div>
+              <div class="muted">Курс: ${escapeHtml(getCourseLabel(user.courseId))}</div>
+              <div class="muted">Група: ${escapeHtml(groupName)}</div>
+            </div>
+            <form id="profileForm">
+              <div class="field">
+                <div class="label">Прізвище</div>
+                <input name="lastName" value="${escapeHtml(user.lastName)}" />
+              </div>
+              <div class="field">
+                <div class="label">Ім'я</div>
+                <input name="firstName" value="${escapeHtml(user.firstName)}" />
+              </div>
+              <div class="field">
+                <div class="label">Тема сайту</div>
+                <select name="theme">
+                  ${themeOptions}
+                </select>
+              </div>
+              <div class="btnbar">
+                <button class="btn btn--primary" type="submit">Зберегти профіль</button>
+              </div>
+              <div id="profileError" class="notice notice--danger" style="display:none; margin-top:12px;"></div>
+            </form>
+          </div>
+          <div>
+            <div class="notice" style="margin-bottom:14px;">
+              <div style="font-weight:900; margin-bottom:6px;">Статистика</div>
+              <div class="muted">Середній бал: ${grades.average == null ? "Н/Д" : grades.average.toFixed(1)}</div>
+              <div class="muted">Відвідуваність: ${attendance.total ? `${attendance.percent}%` : "Н/Д"}</div>
+              <div class="muted">Рейтинг у групі: ${grades.average == null ? "Н/Д" : `${allStudentsOnCourse(db, user).findIndex(x => x.studentId === user.id) + 1}/${allStudentsOnCourse(db, user).length}`}</div>
+            </div>
+            <div class="notice">
+              <div style="font-weight:900; margin-bottom:6px;">Налаштування</div>
+              <div class="muted">У профілі можна змінювати ім'я та тему сайту, а також переглядати базову статистику.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const profileForm = $("#profileForm");
+    if (profileForm) {
+      profileForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const formData = new FormData(profileForm);
+        const lastName = String(formData.get("lastName") || "").trim();
+        const firstName = String(formData.get("firstName") || "").trim();
+        const theme = normalizeTheme(formData.get("theme"));
+        const box = $("#profileError");
+        if (box) box.style.display = "none";
+        if (!lastName || !firstName) {
+          if (box) {
+            box.style.display = "";
+            box.textContent = "Вкажіть ім'я та прізвище.";
+          }
+          return;
+        }
+        const db2 = loadDB();
+        const target = db2.users.find((u) => u.id === user.id);
+        if (target) {
+          target.lastName = lastName;
+          target.firstName = firstName;
+          target.theme = theme;
+          saveDB(db2);
+          localStorage.setItem(SESSION_KEY, target.id);
+          render();
+        }
+      });
+    }
+  }
+
+  function allStudentsOnCourse(db, user) {
+    return courseStudents(db, user.courseId).map((student) => ({
+      studentId: student.id,
+      average: getGradeStats(db, student.id).average,
+    }));
+  }
+
+  function renderStarostaPage(db, user) {
+    const group = getGroupForCourse(db, user.courseId);
+    const groupName = group?.name?.trim() ? group.name.trim() : `Група ${user.courseId}`;
+    const students = courseStudents(db, user.courseId);
+    const rows = students
+      .map((student) => {
+        const grades = getGradeStats(db, student.id);
+        const attendance = getAttendanceStats(db, student);
+        return `
+          <tr>
+            <td>${escapeHtml(getStudentFullName(student))}</td>
+            <td>${grades.average == null ? "Н/Д" : grades.average.toFixed(1)}</td>
+            <td>${attendance.total ? `${attendance.percent}%` : "Н/Д"}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    elApp.innerHTML = `
+      <div class="card">
+        <div class="row" style="margin-bottom:12px;">
+          <div>
+            <h2 class="section-title" style="margin:0;">Староста ${escapeHtml(groupName)}</h2>
+            <div class="muted" style="margin-top:6px;">Керування статистикою своєї групи.</div>
+          </div>
+          <div>
+            <span class="pill pill--accent">Староста</span>
+          </div>
+        </div>
+        <div class="notice" style="margin-bottom:14px;">
+          <div style="font-weight:900; margin-bottom:6px;">Група</div>
+          <div class="muted">${escapeHtml(groupName)} · ${escapeHtml(getCourseLabel(user.courseId))}</div>
+        </div>
+        <div class="tableWrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Студент</th>
+                <th>Середній бал</th>
+                <th>Відвідуваність</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || `<tr><td colspan="3" class="muted">Немає студентів у групі.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   function courseStudents(db, courseId) {
     const cid = Number(courseId);
     return db.users
@@ -734,6 +936,7 @@
           <div class="tab" data-admin-tab="attendance">Відвідуваність</div>
           <div class="tab" data-admin-tab="grades">Оцінки</div>
           <div class="tab" data-admin-tab="stats">Статистика</div>
+          <div class="tab" data-admin-tab="telegram">Telegram</div>
           <div class="tab" data-admin-tab="admins">Адміни</div>
         </div>
 
@@ -786,8 +989,9 @@
                                       ${COURSES.map((c) => `<option value="${c}" ${c === courseId ? "selected" : ""}>${escapeHtml(getCourseLabel(c))}</option>`).join("")}
                                     </select>
                                   </td>
-                                  <td style="width: 200px;">
+                                  <td style="width: 240px; display:flex; gap:8px;">
                                     <button class="btn btn--primary btnSaveStudentCourse" type="button" data-student-id="${escapeHtml(s.id)}">Зберегти</button>
+                                    <button class="btn btn--ok btnMakeStarosta" type="button" data-student-id="${escapeHtml(s.id)}">Староста</button>
                                   </td>
                                 </tr>
                               `;
@@ -1053,6 +1257,28 @@
             </div>
           </div>
 
+          <div data-admin-content="telegram" style="display:none;">
+            <div class="section-title" style="font-size:16px;">Telegram інтеграція</div>
+            <div class="muted" style="margin-bottom:12px; font-size:13px;">Підключення бота для надсилання повідомлень у групу.</div>
+
+            <form id="telegramForm">
+              <div class="field">
+                <div class="label">Bot Token</div>
+                <input name="telegramBotToken" type="text" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" value="${escapeHtml(db.settings.telegramBotToken)}" />
+              </div>
+              <div class="field">
+                <div class="label">Chat ID</div>
+                <input name="telegramChatId" type="text" placeholder="-1001234567890" value="${escapeHtml(db.settings.telegramChatId)}" />
+              </div>
+              <div class="btnbar">
+                <button class="btn btn--primary" type="submit">Зберегти налаштування</button>
+                <button class="btn" type="button" id="btnSendTelegramTest">Відправити тест</button>
+              </div>
+              <div id="telegramError" class="notice notice--danger" style="display:none; margin-top:12px;"></div>
+              <div id="telegramSuccess" class="notice notice--ok" style="display:none; margin-top:12px;"></div>
+            </form>
+          </div>
+
           <div data-admin-content="admins" style="display:none;">
             <div class="split">
               <div class="split__left">
@@ -1162,6 +1388,22 @@
         const student = db2.users.find((u) => u.id === studentId);
         if (student && COURSES.includes(courseId)) {
           student.courseId = courseId;
+          saveDB(db2);
+        }
+        render();
+      });
+    });
+
+    document.querySelectorAll(".btnMakeStarosta").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const db2 = loadDB();
+        const studentId = btn.getAttribute("data-student-id");
+        const student = db2.users.find((u) => u.id === studentId);
+        if (student) {
+          // Ensure only one starosta per course
+          const existing = db2.users.find((u) => u.role === "starosta" && u.courseId === student.courseId);
+          if (existing) existing.role = "student";
+          student.role = "starosta";
           saveDB(db2);
         }
         render();
@@ -1489,6 +1731,70 @@
       });
     }
 
+    const telegramForm = $("#telegramForm");
+    if (telegramForm) {
+      telegramForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const formData = new FormData(telegramForm);
+        const botToken = String(formData.get("telegramBotToken") || "").trim();
+        const chatId = String(formData.get("telegramChatId") || "").trim();
+        const boxError = $("#telegramError");
+        const boxSuccess = $("#telegramSuccess");
+        if (boxError) boxError.style.display = "none";
+        if (boxSuccess) boxSuccess.style.display = "none";
+        if (!botToken || !chatId) {
+          if (boxError) {
+            boxError.style.display = "";
+            boxError.textContent = "Вкажіть токен бота та chat ID.";
+          }
+          return;
+        }
+        const db2 = loadDB();
+        db2.settings.telegramBotToken = botToken;
+        db2.settings.telegramChatId = chatId;
+        saveDB(db2);
+        if (boxSuccess) {
+          boxSuccess.style.display = "";
+          boxSuccess.textContent = "Налаштування збережено.";
+        }
+      });
+    }
+
+    const btnSendTelegramTest = $("#btnSendTelegramTest");
+    if (btnSendTelegramTest) {
+      btnSendTelegramTest.addEventListener("click", async () => {
+        const db2 = loadDB();
+        const token = String(db2.settings.telegramBotToken || "").trim();
+        const chatId = String(db2.settings.telegramChatId || "").trim();
+        const boxError = $("#telegramError");
+        const boxSuccess = $("#telegramSuccess");
+        if (boxError) boxError.style.display = "none";
+        if (boxSuccess) boxSuccess.style.display = "none";
+        if (!token || !chatId) {
+          if (boxError) {
+            boxError.style.display = "";
+            boxError.textContent = "Спочатку збережіть токен і чат ID.";
+          }
+          return;
+        }
+        try {
+          const msg = encodeURIComponent("Тестове повідомлення з платформи студентів.");
+          const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${encodeURIComponent(chatId)}&text=${msg}`);
+          const result = await response.json();
+          if (!result.ok) throw new Error(result.description || "Помилка Telegram");
+          if (boxSuccess) {
+            boxSuccess.style.display = "";
+            boxSuccess.textContent = "Тестове повідомлення надіслано.";
+          }
+        } catch (err) {
+          if (boxError) {
+            boxError.style.display = "";
+            boxError.textContent = `Помилка: ${err.message || err}`;
+          }
+        }
+      });
+    }
+
     // Initial render for attendance recent+form once tab opened.
     renderAttendanceRecent();
 
@@ -1554,11 +1860,14 @@
   function render() {
     const db = loadDB();
     const user = getSessionUser(db);
-    console.log('render() route=', currentRoute(), 'user=', user ? user.email : null);
+    const route = currentRoute();
+    const theme = user ? normalizeTheme(user.theme) : normalizeTheme(localStorage.getItem(THEME_KEY));
+    applyTheme(theme);
+    setPageClass(route);
     setNavVisibleByRole(db, user);
     renderUserBadge(db, user);
+    console.log('render() route=', route, 'user=', user ? user.email : null);
 
-    const route = currentRoute();
     const r = route.toLowerCase();
 
     if (!user) {
@@ -1580,9 +1889,18 @@
     if (r === "/" || r === "") return renderLanding(db, user);
     if (r === "/вхід") return renderAuthCard("login", db);
     if (r === "/реєстрація") return renderAuthCard("register", db);
+    if (r === "/профіль") {
+      if (!user) return;
+      return renderProfile(db, user);
+    }
     if (r === "/кабінет") {
       if (!user) return;
       return renderStudentCabinet(db, user);
+    }
+    if (r === "/староста") {
+      if (!user) return;
+      if (user.role !== "starosta") return renderAdminUnauthorized();
+      return renderStarostaPage(db, user);
     }
     if (r === "/адмін") {
       if (!user) return;
