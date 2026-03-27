@@ -322,15 +322,15 @@
       elUserBadge.innerHTML = "";
       return;
     }
-    const group = getGroupForCourse(db, user.courseId);
-    const groupName = group?.name?.trim() ? group.name.trim() : `Група ${user.courseId}`;
+
+    const roleLabel = user.role === "admin" ? "Адмін" : "Слухач";
 
     elUserBadge.innerHTML = `
       <div class="user-badge__inner">
         <div style="text-align:right;">
           <div style="font-weight:900; line-height:1.1;">${escapeHtml(getStudentFullName(user))}</div>
           <div style="color:rgba(234,240,255,.7); font-size:12.5px; margin-top:3px;">
-            ${escapeHtml(getCourseLabel(user.courseId))} · ${escapeHtml(groupName)}
+            ${escapeHtml(roleLabel)}
           </div>
           <div style="margin-top:10px;">
             <button class="btn" id="btnLogout" type="button">Вийти</button>
@@ -381,7 +381,7 @@
             Власна музична платформа з топ-треками, артистами та плейлистами. Налаштуй стрімінг під власний стиль — без зайвих екранів.
           </p>
           <div class="btnbar hero-card__actions">
-            ${user ? `<button class="btn btn--primary" type="button" id="btnToCabinet">Мій кабінет</button>` : `<button class="btn btn--primary" type="button" id="btnToLogin">Увійти</button>`}
+            ${user ? `<button class="btn btn--primary" type="button" id="btnToCabinet">Медіатека</button>` : `<button class="btn btn--primary" type="button" id="btnToLogin">Увійти</button>`}
             <button class="btn" type="button" id="btnToRegister">Реєстрація</button>
           </div>
         </div>
@@ -398,6 +398,23 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="grid grid--3">
+        ${topTracks
+          .map(
+            (track, index) => `
+              <div class="card playlist-item playlist-item--featured">
+                <div class="playlist-item__thumb featured-thumb"></div>
+                <div class="playlist-item__info">
+                  <div class="playlist-item__title">${escapeHtml(track.title)}</div>
+                  <div class="playlist-item__meta">${escapeHtml(getArtistById(db, track.artistId)?.name || "Артист")}</div>
+                </div>
+                <button class="btn btn--primary" type="button">Play</button>
+              </div>
+            `
+          )
+          .join("")}
       </div>
 
       <div class="grid grid--2">
@@ -651,179 +668,91 @@
   }
 
   function renderStudentCabinet(db, user) {
-    const group = getGroupForCourse(db, user.courseId);
-    const groupName = group?.name?.trim() ? group.name.trim() : `Група ${user.courseId}`;
-    const attendance = getAttendanceStats(db, user);
-    const grades = getGradeStats(db, user.id);
-
-    const passThreshold = Number(db.settings.passThreshold ?? 60);
-    const avg = grades.average;
-    const passed = avg == null ? null : avg >= passThreshold;
-    
-    // Get all students on same course for ranking
-    const allStudentsOnCourse = db.users.filter(u => u.role === "student" && u.courseId === user.courseId);
-    const allGradesOnCourse = allStudentsOnCourse.map(s => ({
-      studentId: s.id,
-      fullName: getStudentFullName(s),
-      average: getGradeStats(db, s.id).average
-    })).filter(x => x.average != null).sort((a, b) => b.average - a.average);
-    
-    const userRank = allGradesOnCourse.findIndex(x => x.studentId === user.id) + 1;
-    const totalStudents = allGradesOnCourse.length;
-
-    const chartItems = grades.list
-      .slice()
-      .reverse()
-      .slice(-6)
-      .map((g) => {
-        const subject = db.subjects.find((s) => s.id === g.subjectId);
-        return { label: (g.dateISO || "").slice(5), value: Number(g.score), subject: subject?.name || "" };
-      });
+    const trackCount = db.tracks.length;
+    const artistCount = db.artists.length;
+    const totalPlays = db.tracks.reduce((sum, track) => sum + Number(track.plays || 0), 0);
+    const latestTracks = getLatestTracks(db, 4);
+    const topArtists = getTopArtists(db, 4);
 
     elApp.innerHTML = `
       <div class="card">
         <div class="row" style="margin-bottom:12px;">
           <div>
-            <h2 class="section-title" style="margin:0;">Кабінет студента</h2>
-            <div class="muted" style="margin-top:6px;">${escapeHtml(groupName)} · ${escapeHtml(getCourseLabel(user.courseId))}</div>
+            <h2 class="section-title" style="margin:0;">Медіатека</h2>
+            <div class="muted" style="margin-top:6px;">Переглядайте ваші треки й найгарячіші релізи.</div>
           </div>
           <div>
-            <span class="pill pill--accent">${escapeHtml(user.role === "admin" ? "Адмін" : "Студент")}</span>
+            <span class="pill pill--accent">${escapeHtml(user.role === "admin" ? "Адмін" : "Слухач")}</span>
           </div>
         </div>
 
-        <div class="grid grid--4" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+        <div class="grid grid--4" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap:16px;">
           <div class="notice">
-            <div class="muted" style="font-weight:800; margin-bottom:4px;">Відвідуваність</div>
-            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">${attendance.total ? `${attendance.percent}%` : "Н/Д"}</div>
-            <div class="muted">Присутній: ${attendance.present}/${attendance.total}</div>
+            <div class="muted" style="font-weight:800; margin-bottom:4px;">Треків</div>
+            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">${trackCount}</div>
+            <div class="muted">у бібліотеці</div>
           </div>
           <div class="notice">
-            <div class="muted" style="font-weight:800; margin-bottom:4px;">Середній бал</div>
-            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">
-              ${avg == null ? "Н/Д" : `${avg.toFixed(1)}`}
-            </div>
-            <div class="muted">
-              Поріг: ${passThreshold}%
-            </div>
+            <div class="muted" style="font-weight:800; margin-bottom:4px;">Артистів</div>
+            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">${artistCount}</div>
+            <div class="muted">профілі артистів</div>
           </div>
           <div class="notice">
-            <div class="muted" style="font-weight:800; margin-bottom:4px;">Статус</div>
-            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">
-              ${
-                passed == null ? "—" : passed ? "✓ Успішно" : "⚠ Потрібна увага"
-              }
-            </div>
-            <div class="muted">Оцінки вносяться адміном</div>
+            <div class="muted" style="font-weight:800; margin-bottom:4px;">Прослуховувань</div>
+            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">${totalPlays.toLocaleString()}</div>
+            <div class="muted">усіх треків</div>
           </div>
           <div class="notice">
-            <div class="muted" style="font-weight:800; margin-bottom:4px;">Рейтинг у групі</div>
-            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">
-              ${totalStudents > 0 ? `${userRank}/${totalStudents}` : "Н/Д"}
-            </div>
-            <div class="muted">За середнім балом</div>
+            <div class="muted" style="font-weight:800; margin-bottom:4px;">Останній реліз</div>
+            <div style="font-weight:1000; font-size:22px; margin-bottom:6px;">${escapeHtml(latestTracks[0]?.title || "Немає")}</div>
+            <div class="muted">${escapeHtml(getArtistById(db, latestTracks[0]?.artistId)?.name || "—")}</div>
           </div>
         </div>
 
-        <div class="grid grid--2" style="margin-top:14px;">
+        <div class="grid grid--2" style="margin-top:18px; align-items:start; gap:18px;">
           <div>
-            <div class="section-title" style="font-size:16px;">Останні оцінки (графік)</div>
-            <canvas class="chart" id="scoreChart" width="520" height="130"></canvas>
-            <div class="muted" style="margin-top:10px; font-size:13px;">
-              ${grades.list.length ? "Показуються останні оцінки з датами." : "Немає оцінок — адмін додасть їх в панелі."}
-            </div>
-          </div>
-          <div>
-            <div class="section-title" style="font-size:16px;">Останні заняття (відвідуваність)</div>
-            <div class="tableWrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>Дата</th>
-                    <th>Статус</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${
-                    attendance.sessions.length
-                      ? attendance.sessions
-                          .map(
-                            (s) => `
-                        <tr>
-                          <td>${escapeHtml(formatDate(s.dateISO))}</td>
-                          <td>
-                            ${
-                              s.present
-                                ? '<span class="pill pill--ok">Присутній</span>'
-                                : '<span class="pill pill--danger">Відсутній</span>'
-                            }
-                          </td>
-                        </tr>
-                      `
-                          )
-                          .join("")
-                      : `
-                    <tr>
-                      <td colspan="2" class="muted">Немає даних.</td>
-                    </tr>
+            <div class="section-title">Нові релізи</div>
+            <div class="track-list">
+              ${latestTracks
+                .map(
+                  (track, index) => `
+                    <div class="track-row">
+                      <div class="track-row__info">
+                        <div class="track-row__index">${String(index + 1).padStart(2, "0")}</div>
+                        <div>
+                          <div class="track-row__title">${escapeHtml(track.title)}</div>
+                          <div class="track-row__meta">${escapeHtml(getArtistById(db, track.artistId)?.name || "Артист")} • ${escapeHtml(track.album)}</div>
+                        </div>
+                      </div>
+                      <div class="track-row__meta">${escapeHtml(track.duration)}</div>
+                    </div>
                   `
-                  }
-                </tbody>
-              </table>
+                )
+                .join("")}
             </div>
           </div>
-        </div>
 
-        <div style="margin-top:14px;">
-          <div class="section-title" style="font-size:16px;">Список оцінок</div>
-          <div class="tableWrap">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Предмет</th>
-                  <th>Оцінка</th>
-                  <th>Дата</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${
-                  grades.list.length
-                    ? grades.list
-                        .slice(0, 12)
-                        .map((g) => {
-                          const subject = db.subjects.find((s) => s.id === g.subjectId);
-                          return `
-                        <tr>
-                          <td>${escapeHtml(subject?.name || "Невідомий предмет")}</td>
-                          <td>${escapeHtml(String(g.score))}%</td>
-                          <td>${escapeHtml(formatDate(g.dateISO || ""))}</td>
-                        </tr>
-                      `;
-                        })
-                        .join("")
-                    : `
-                  <tr>
-                    <td colspan="3" class="muted">Немає оцінок.</td>
-                  </tr>
-                `
-                }
-              </tbody>
-            </table>
-          </div>
-          <div class="muted" style="margin-top:10px; font-size:13px;">
-            Порада: адмін керує списком предметів і виставляє оцінки в адмін-панелі.
+          <div>
+            <div class="section-title">Топ артисти</div>
+            <div class="artist-list">
+              ${topArtists
+                .map(
+                  (artist) => `
+                    <div class="artist-item">
+                      <div class="artist-item__avatar"></div>
+                      <div class="artist-item__info">
+                        <div class="artist-item__name">${escapeHtml(artist.name)}</div>
+                        <div class="artist-item__stats">${Number(artist.followers).toLocaleString()} підписників • ${Number(artist.plays).toLocaleString()} прослуховувань</div>
+                      </div>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
           </div>
         </div>
       </div>
     `;
-
-    const canvas = document.getElementById("scoreChart");
-    if (canvas && canvas.getContext) {
-      // Make responsive canvas scaling.
-      canvas.width = 520;
-      canvas.height = 130;
-      if (chartItems.length) drawSimpleBarChart(canvas, chartItems);
-    }
   }
 
   function renderProfile(db, user) {
@@ -1245,7 +1174,7 @@
                 <div class="notice" style="margin-top:12px;">
                   <div style="font-weight:900; margin-bottom:6px;">Пояснення</div>
                   <div class="muted" style="line-height:1.5;">
-                    Кабінет студента рахує середній бал та відображає останні записи.
+                    Адмін-панель керує каталогом треків, артистів і релізів у бібліотеці.
                   </div>
                 </div>
               </div>
@@ -1254,7 +1183,7 @@
 
           <div data-admin-content="stats" style="display:none;">
             <div class="section-title" style="font-size:16px;">Загальна статистика</div>
-            <div class="muted" style="margin-bottom:14px; font-size:13px;">Аналітика студентів та їхніх показників.</div>
+            <div class="muted" style="margin-bottom:14px; font-size:13px;">Аналітика треків, прослуховувань та популярності.</div>
 
             <div class="grid grid--4" style="margin-bottom:14px;">
               <div class="notice">
@@ -1447,7 +1376,7 @@
         </div>
 
         <div class="muted" style="font-size:12.5px; margin-top:14px;">
-          Порада: якщо ви змінюєте щось в адмін-панелі, кабінет студента оновлюється одразу після перезавантаження сторінки.
+          Порада: якщо ви змінюєте щось в адмін-панелі, музична бібліотека оновиться після перезавантаження сторінки.
         </div>
       </div>
     `;
