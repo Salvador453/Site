@@ -333,32 +333,126 @@
         : "";
 
     elApp.innerHTML = `
-      <div class="card">
-        <h2 class="section-title">Швидкий старт</h2>
-        <div class="grid grid--2">
-          <div class="notice">
-            <div style="font-weight:900; margin-bottom:6px;">Студентам</div>
-            <div class="muted">
-              Реєстрація по email та прізвищу/імені, вибір курсу 1–4, перегляд відвідуваності й оцінок у кабінеті.
-            </div>
+      <div class="hero-card">
+        <div class="hero-card__head">
+          <span class="hero-card__label">MUSIKALЬНА ПЛАТФОРМА</span>
+          <h1 class="hero-card__title">Слухай трендові пісні весь час</h1>
+          <p class="hero-card__text">
+            Твій студентський дашборд у сучасному музичному стилі. Відстежуй курси, відвідуваність і оцінки в інтерфейсі, як у професійному музичному додатку.
+          </p>
+          <div class="btnbar hero-card__actions">
+            ${user ? `<button class="btn btn--primary" type="button" id="btnToCabinet">Кабінет</button>` : `<button class="btn btn--primary" type="button" id="btnToLogin">Вхід</button>`}
+            <button class="btn" type="button" id="btnToRegister">Реєстрація</button>
           </div>
-          <div class="notice">
-            <div style="font-weight:900; margin-bottom:6px;">Адміну</div>
-            <div class="muted">
-              Керування групами, призначення адміністраторів, внесення відвідуваності та оцінок, перегляд статистики студентів.
+        </div>
+        <div class="hero-card__visual">
+          <div class="hero-card__image">
+            <div class="music-card">
+              <div class="music-card__top">Top Artist</div>
+              <div class="music-card__title">Mamank</div>
+              <div class="music-card__subtitle">New single trending</div>
+              <div class="music-card__footer">
+                <div class="music-card__stats">1.9k Followers</div>
+                <button class="btn btn--primary">Play</button>
+              </div>
             </div>
           </div>
         </div>
-
-        ${adminHint}
-
-        <div class="btnbar" style="margin-top:14px;">
-          ${user ? `<button class="btn btn--primary" type="button" id="btnToCabinet">Кабінет</button>` : ""}
-          <button class="btn btn--primary" type="button" id="btnToLogin">Вхід</button>
-          <button class="btn" type="button" id="btnToRegister">Реєстрація</button>
-        </div>
-
       </div>
+
+      <div class="grid grid--2">
+        <div class="card playlist-card">
+          <div class="section-title">Playlist</div>
+          <div class="playlist-grid">
+            <div class="playlist-item">
+              <div class="playlist-item__thumb"></div>
+              <div class="playlist-item__info">
+                <div class="playlist-item__title">Musik Pagi</div>
+                <div class="playlist-item__meta">12 Tracks • 1.3k Plays</div>
+              </div>
+            </div>
+            <div class="playlist-item">
+              <div class="playlist-item__thumb"></div>
+              <div class="playlist-item__info">
+                <div class="playlist-item__title">Musik Anu</div>
+                <div class="playlist-item__meta">18 Tracks • 4.2k Plays</div>
+              </div>
+            </div>
+            <div class="playlist-item">
+              <div class="playlist-item__thumb"></div>
+              <div class="playlist-item__info">
+                <div class="playlist-item__title">Lofi Bass</div>
+                <div class="playlist-item__meta">10 Tracks • 2.7k Plays</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Trending</div>
+          <div class="track-list">
+            <div class="track-row">
+              <div class="track-row__info">
+                <div class="track-row__index">01</div>
+                <div>
+                  <div class="track-row__title">Balonku Ada 5 Meter</div>
+                  <div class="track-row__meta">Mamank • Dance Beat</div>
+                </div>
+              </div>
+              <div class="track-row__meta">3:20</div>
+            </div>
+            <div class="track-row">
+              <div class="track-row__info">
+                <div class="track-row__index">02</div>
+                <div>
+                  <div class="track-row__title">Kucing Kesayangan</div>
+                  <div class="track-row__meta">Maimunah • Electro Pop</div>
+                </div>
+              </div>
+              <div class="track-row__meta">3:20</div>
+            </div>
+            <div class="track-row">
+              <div class="track-row__info">
+                <div class="track-row__index">03</div>
+                <div>
+                  <div class="track-row__title">Pajio</div>
+                  <div class="track-row__meta">Mamank • Remix</div>
+                </div>
+              </div>
+              <div class="track-row__meta">3:30</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card top-artists-card">
+        <div class="section-title">Top Artist</div>
+        <div class="artist-list">
+          <div class="artist-item">
+            <div class="artist-item__avatar"></div>
+            <div class="artist-item__info">
+              <div class="artist-item__name">Mamank</div>
+              <div class="artist-item__stats">1.9k Followers • 122M Plays</div>
+            </div>
+          </div>
+          <div class="artist-item">
+            <div class="artist-item__avatar"></div>
+            <div class="artist-item__info">
+              <div class="artist-item__name">Maimunah</div>
+              <div class="artist-item__stats">1.9k Followers • 50M Plays</div>
+            </div>
+          </div>
+          <div class="artist-item">
+            <div class="artist-item__avatar"></div>
+            <div class="artist-item__info">
+              <div class="artist-item__name">Pajio</div>
+              <div class="artist-item__stats">1.9k Followers • 22M Plays</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      ${adminHint}
     `;
     const btnToLogin = $("#btnToLogin");
     if (btnToLogin) btnToLogin.addEventListener("click", () => (location.hash = "#/вхід"));
