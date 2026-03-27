@@ -274,3 +274,21 @@ input:focus, select:focus, textarea:focus{
   width: 100%;
 }
 
+.tableWrap{
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 14px;
+}
+
+@media (max-width: 600px){
+  .topbar{ flex-direction: column; align-items: flex-start; }
+  .brand{ min-width: auto; }
+  .nav{ flex-direction: column; align-items: flex-start; width: 100%; }
+  .authbar{ width: 100%; }
+  .table{ font-size: 13px; }
+  .table th, .table td{ padding: 8px 10px; }
+  .grid--2, .grid--3, .grid--4{ grid-template-columns: 1fr; }
+  input, select, textarea{ padding: 10px 11px; font-size: 16px; }
+  .btn{ padding: 9px 11px; font-size: 13px; }
+}
+
