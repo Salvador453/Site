@@ -31,6 +31,17 @@
     subjects: [],
     grades: [], // {id, studentId, subjectId, score, dateISO}
     attendance: [], // {id, courseId, dateISO, studentId, present}
+    artists: [
+      { id: "artist-1", name: "Mamank", followers: 1928, plays: 122000000, genre: "Dance Beat" },
+      { id: "artist-2", name: "Maimunah", followers: 1980, plays: 54000000, genre: "Electro Pop" },
+      { id: "artist-3", name: "Pajio", followers: 1520, plays: 32000000, genre: "Pop" },
+    ],
+    tracks: [
+      { id: "track-1", title: "Balonku Ada 5 Meter", artistId: "artist-1", album: "Studio Vibes", duration: "3:20", plays: 122000000, cover: "", releaseYear: 2025 },
+      { id: "track-2", title: "Kucing Kesayangan", artistId: "artist-2", album: "Neon Nights", duration: "3:20", plays: 50000000, cover: "", releaseYear: 2025 },
+      { id: "track-3", title: "Pajio", artistId: "artist-3", album: "City Lights", duration: "3:30", plays: 22000000, cover: "", releaseYear: 2025 },
+      { id: "track-4", title: "Lofi Bass", artistId: "artist-3", album: "Relaxed Sessions", duration: "3:05", plays: 18000000, cover: "", releaseYear: 2024 },
+    ],
     settings: {
       passThreshold: 60,
       telegramBotToken: "",
@@ -64,6 +75,8 @@
     if (!Array.isArray(db.subjects)) db.subjects = [];
     if (!Array.isArray(db.grades)) db.grades = [];
     if (!Array.isArray(db.attendance)) db.attendance = [];
+    if (!Array.isArray(db.artists)) db.artists = [];
+    if (!Array.isArray(db.tracks)) db.tracks = [];
     if (Array.isArray(db.users)) {
       db.users.forEach((u) => {
         if (!SUPPORTED_THEMES.includes(u.theme)) u.theme = DEFAULT_THEME;
@@ -132,6 +145,29 @@
 
   function getCourseLabel(courseId) {
     return `Курс ${courseId}`;
+  }
+
+  function getArtistById(db, id) {
+    return db.artists.find((artist) => artist.id === id) || null;
+  }
+
+  function getTopTracks(db, limit = 3) {
+    return db.tracks.slice().sort((a, b) => b.plays - a.plays).slice(0, limit);
+  }
+
+  function getTopArtists(db, limit = 3) {
+    return db.artists.slice().sort((a, b) => b.followers - a.followers).slice(0, limit);
+  }
+
+  function getLatestTracks(db, limit = 3) {
+    return db.tracks
+      .slice()
+      .sort((a, b) => (b.releaseYear || 0) - (a.releaseYear || 0))
+      .slice(0, limit);
+  }
+
+  function formatDuration(duration) {
+    return duration;
   }
 
   function getGroupForCourse(db, courseId) {
@@ -328,31 +364,35 @@
     const adminHint =
       user && user.role === "admin"
         ? `<div class="notice notice--ok" style="margin-top:12px;">
-            Ви зараз увійшли як адмін. Перейдіть у розділ «Адмін-панель».
+            Ви зараз увійшли як адмін. Перейдіть у розділ «Адмін-панель» для завантаження треків.
           </div>`
         : "";
+
+    const topTracks = getTopTracks(db, 3);
+    const topArtists = getTopArtists(db, 3);
+    const latestTracks = getLatestTracks(db, 3);
 
     elApp.innerHTML = `
       <div class="hero-card">
         <div class="hero-card__head">
-          <span class="hero-card__label">MUSIKALЬНА ПЛАТФОРМА</span>
-          <h1 class="hero-card__title">Слухай трендові пісні весь час</h1>
+          <span class="hero-card__label">TRENDING</span>
+          <h1 class="hero-card__title">Слухай нову музику як у Spotify</h1>
           <p class="hero-card__text">
-            Твій студентський дашборд у сучасному музичному стилі. Відстежуй курси, відвідуваність і оцінки в інтерфейсі, як у професійному музичному додатку.
+            Власна музична платформа з топ-треками, артистами та плейлистами. Налаштуй стрімінг під власний стиль — без зайвих екранів.
           </p>
           <div class="btnbar hero-card__actions">
-            ${user ? `<button class="btn btn--primary" type="button" id="btnToCabinet">Кабінет</button>` : `<button class="btn btn--primary" type="button" id="btnToLogin">Вхід</button>`}
+            ${user ? `<button class="btn btn--primary" type="button" id="btnToCabinet">Мій кабінет</button>` : `<button class="btn btn--primary" type="button" id="btnToLogin">Увійти</button>`}
             <button class="btn" type="button" id="btnToRegister">Реєстрація</button>
           </div>
         </div>
         <div class="hero-card__visual">
           <div class="hero-card__image">
             <div class="music-card">
-              <div class="music-card__top">Top Artist</div>
-              <div class="music-card__title">Mamank</div>
-              <div class="music-card__subtitle">New single trending</div>
+              <div class="music-card__top">Топ трек</div>
+              <div class="music-card__title">${escapeHtml(topTracks[0]?.title || "Balonku Ada 5 Meter")}</div>
+              <div class="music-card__subtitle">${escapeHtml(getArtistById(db, topTracks[0]?.artistId)?.name || "Mamank")} • ${escapeHtml(topTracks[0]?.album || "Studio Vibes")}</div>
               <div class="music-card__footer">
-                <div class="music-card__stats">1.9k Followers</div>
+                <div class="music-card__stats">${Number(topTracks[0]?.plays || 0).toLocaleString()} прослуховувань</div>
                 <button class="btn btn--primary">Play</button>
               </div>
             </div>
@@ -362,98 +402,69 @@
 
       <div class="grid grid--2">
         <div class="card playlist-card">
-          <div class="section-title">Playlist</div>
+          <div class="section-title">Популярні треки</div>
           <div class="playlist-grid">
-            <div class="playlist-item">
-              <div class="playlist-item__thumb"></div>
-              <div class="playlist-item__info">
-                <div class="playlist-item__title">Musik Pagi</div>
-                <div class="playlist-item__meta">12 Tracks • 1.3k Plays</div>
-              </div>
-            </div>
-            <div class="playlist-item">
-              <div class="playlist-item__thumb"></div>
-              <div class="playlist-item__info">
-                <div class="playlist-item__title">Musik Anu</div>
-                <div class="playlist-item__meta">18 Tracks • 4.2k Plays</div>
-              </div>
-            </div>
-            <div class="playlist-item">
-              <div class="playlist-item__thumb"></div>
-              <div class="playlist-item__info">
-                <div class="playlist-item__title">Lofi Bass</div>
-                <div class="playlist-item__meta">10 Tracks • 2.7k Plays</div>
-              </div>
-            </div>
+            ${topTracks
+              .map(
+                (track) => `
+                  <div class="playlist-item">
+                    <div class="playlist-item__thumb"></div>
+                    <div class="playlist-item__info">
+                      <div class="playlist-item__title">${escapeHtml(track.title)}</div>
+                      <div class="playlist-item__meta">${escapeHtml(getArtistById(db, track.artistId)?.name || "Артист")} • ${escapeHtml(track.duration)}</div>
+                    </div>
+                  </div>
+                `
+              )
+              .join("")}
           </div>
         </div>
 
         <div class="card">
-          <div class="section-title">Trending</div>
+          <div class="section-title">Нові релізи</div>
           <div class="track-list">
-            <div class="track-row">
-              <div class="track-row__info">
-                <div class="track-row__index">01</div>
-                <div>
-                  <div class="track-row__title">Balonku Ada 5 Meter</div>
-                  <div class="track-row__meta">Mamank • Dance Beat</div>
-                </div>
-              </div>
-              <div class="track-row__meta">3:20</div>
-            </div>
-            <div class="track-row">
-              <div class="track-row__info">
-                <div class="track-row__index">02</div>
-                <div>
-                  <div class="track-row__title">Kucing Kesayangan</div>
-                  <div class="track-row__meta">Maimunah • Electro Pop</div>
-                </div>
-              </div>
-              <div class="track-row__meta">3:20</div>
-            </div>
-            <div class="track-row">
-              <div class="track-row__info">
-                <div class="track-row__index">03</div>
-                <div>
-                  <div class="track-row__title">Pajio</div>
-                  <div class="track-row__meta">Mamank • Remix</div>
-                </div>
-              </div>
-              <div class="track-row__meta">3:30</div>
-            </div>
+            ${latestTracks
+              .map(
+                (track, index) => `
+                  <div class="track-row">
+                    <div class="track-row__info">
+                      <div class="track-row__index">${String(index + 1).padStart(2, "0")}</div>
+                      <div>
+                        <div class="track-row__title">${escapeHtml(track.title)}</div>
+                        <div class="track-row__meta">${escapeHtml(getArtistById(db, track.artistId)?.name || "Артист")} • ${escapeHtml(track.album)}</div>
+                      </div>
+                    </div>
+                    <div class="track-row__meta">${escapeHtml(track.duration)}</div>
+                  </div>
+                `
+              )
+              .join("")}
           </div>
         </div>
       </div>
 
       <div class="card top-artists-card">
-        <div class="section-title">Top Artist</div>
+        <div class="section-title">Топ артисти</div>
         <div class="artist-list">
-          <div class="artist-item">
-            <div class="artist-item__avatar"></div>
-            <div class="artist-item__info">
-              <div class="artist-item__name">Mamank</div>
-              <div class="artist-item__stats">1.9k Followers • 122M Plays</div>
-            </div>
-          </div>
-          <div class="artist-item">
-            <div class="artist-item__avatar"></div>
-            <div class="artist-item__info">
-              <div class="artist-item__name">Maimunah</div>
-              <div class="artist-item__stats">1.9k Followers • 50M Plays</div>
-            </div>
-          </div>
-          <div class="artist-item">
-            <div class="artist-item__avatar"></div>
-            <div class="artist-item__info">
-              <div class="artist-item__name">Pajio</div>
-              <div class="artist-item__stats">1.9k Followers • 22M Plays</div>
-            </div>
-          </div>
+          ${topArtists
+            .map(
+              (artist) => `
+                <div class="artist-item">
+                  <div class="artist-item__avatar"></div>
+                  <div class="artist-item__info">
+                    <div class="artist-item__name">${escapeHtml(artist.name)}</div>
+                    <div class="artist-item__stats">${Number(artist.followers).toLocaleString()} підписників • ${Number(artist.plays).toLocaleString()} прослуховувань</div>
+                  </div>
+                </div>
+              `
+            )
+            .join("")}
         </div>
       </div>
 
       ${adminHint}
     `;
+
     const btnToLogin = $("#btnToLogin");
     if (btnToLogin) btnToLogin.addEventListener("click", () => (location.hash = "#/вхід"));
     const btnToRegister = $("#btnToRegister");
