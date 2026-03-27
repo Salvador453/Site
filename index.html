@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Студентська платформа</title>
+    <title>Muziq</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -11,23 +11,23 @@
     <div class="layout">
       <aside class="sidebar">
         <div class="sidebar__brand">
-          <div class="brand__logo" aria-hidden="true">◉</div>
+          <div class="brand__logo" aria-hidden="true">♫</div>
           <div>
-            <div class="brand__title">Студентська платформа</div>
-            <div class="brand__subtitle">Статистика та успішність</div>
+            <div class="brand__title">Muziq</div>
+            <div class="brand__subtitle">Музична платформа</div>
           </div>
         </div>
 
         <nav class="sidebar__nav">
           <a href="#/" class="sidebar__link" data-nav>Головна</a>
-          <a href="#/кабінет" class="sidebar__link" data-nav>Кабінет</a>
+          <a href="#/кабінет" class="sidebar__link" data-nav>Медіатека</a>
           <a href="#/профіль" class="sidebar__link sidebar__link--hidden nav__link--profile" data-nav>Профіль</a>
           <a href="#/староста" class="sidebar__link sidebar__link--hidden nav__link--starosta" data-nav>Староста</a>
-          <a href="#/адмін" class="sidebar__link sidebar__link--admin" data-nav>Адмін-панель</a>
+          <a href="#/адмін" class="sidebar__link sidebar__link--admin" data-nav>Адмін</a>
         </nav>
 
         <div class="sidebar__section">
-          <div class="section-title">Мої дані</div>
+          <div class="section-title">Твій плеєр</div>
           <div id="userBadge" class="sidebar__user user-badge" role="status" aria-live="polite"></div>
         </div>
       </aside>
@@ -35,16 +35,41 @@
       <div class="page-wrapper">
         <header class="topbar">
           <div class="topbar__search">
-            <input type="search" placeholder="Пошук..." aria-label="Пошук" />
+            <input type="search" placeholder="Що хочеш слухати?" aria-label="Пошук" />
           </div>
           <div class="topbar__actions">
-            <button class="btn btn--primary">Explore Now</button>
+            <button class="btn btn--primary">Play</button>
           </div>
         </header>
 
         <main class="container">
           <section id="app" class="app"></section>
         </main>
+      </div>
+    </div>
+
+    <div class="player-bar">
+      <div class="player-bar__left">
+        <div class="player-bar__thumb"></div>
+        <div>
+          <div class="player-bar__title">Balonku Ada 5 Meter</div>
+          <div class="player-bar__artist">Mamank</div>
+        </div>
+      </div>
+      <div class="player-bar__center">
+        <div class="player-controls">
+          <button class="player-btn" type="button">⏮</button>
+          <button class="player-btn player-btn--play" type="button">▶</button>
+          <button class="player-btn" type="button">⏭</button>
+        </div>
+        <div class="player-bar__progress">
+          <span>1:12</span>
+          <div class="progress-track"><div class="progress-fill" style="width:32%"></div></div>
+          <span>3:20</span>
+        </div>
+      </div>
+      <div class="player-bar__right">
+        <button class="btn btn--primary" type="button">Черга</button>
       </div>
     </div>
 
