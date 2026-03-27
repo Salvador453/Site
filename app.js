@@ -35,12 +35,28 @@
       { id: "artist-1", name: "Mamank", followers: 1928, plays: 122000000, genre: "Dance Beat" },
       { id: "artist-2", name: "Maimunah", followers: 1980, plays: 54000000, genre: "Electro Pop" },
       { id: "artist-3", name: "Pajio", followers: 1520, plays: 32000000, genre: "Pop" },
+      { id: "artist-4", name: "NovaWave", followers: 8820, plays: 93000000, genre: "Synthwave" },
+      { id: "artist-5", name: "Solaris", followers: 7600, plays: 68000000, genre: "Chillout" },
+      { id: "artist-6", name: "Velvet Drift", followers: 4300, plays: 25000000, genre: "Lounge" },
+      { id: "artist-7", name: "Midnight Echo", followers: 3150, plays: 41000000, genre: "Ambient" },
+      { id: "artist-8", name: "Pulse Six", followers: 11400, plays: 145000000, genre: "House" },
     ],
     tracks: [
       { id: "track-1", title: "Balonku Ada 5 Meter", artistId: "artist-1", album: "Studio Vibes", duration: "3:20", plays: 122000000, cover: "", releaseYear: 2025 },
       { id: "track-2", title: "Kucing Kesayangan", artistId: "artist-2", album: "Neon Nights", duration: "3:20", plays: 50000000, cover: "", releaseYear: 2025 },
       { id: "track-3", title: "Pajio", artistId: "artist-3", album: "City Lights", duration: "3:30", plays: 22000000, cover: "", releaseYear: 2025 },
       { id: "track-4", title: "Lofi Bass", artistId: "artist-3", album: "Relaxed Sessions", duration: "3:05", plays: 18000000, cover: "", releaseYear: 2024 },
+      { id: "track-5", title: "Night Drive", artistId: "artist-4", album: "Midnight Cruise", duration: "4:02", plays: 93000000, cover: "", releaseYear: 2025 },
+      { id: "track-6", title: "Starlight", artistId: "artist-5", album: "Sunset Chill", duration: "3:45", plays: 68000000, cover: "", releaseYear: 2024 },
+      { id: "track-7", title: "Velvet Skies", artistId: "artist-6", album: "Afterglow", duration: "3:55", plays: 25000000, cover: "", releaseYear: 2023 },
+      { id: "track-8", title: "Echoes", artistId: "artist-7", album: "Dreamscape", duration: "4:18", plays: 41000000, cover: "", releaseYear: 2024 },
+      { id: "track-9", title: "Neon Pulse", artistId: "artist-8", album: "Club Motion", duration: "3:10", plays: 145000000, cover: "", releaseYear: 2025 },
+      { id: "track-10", title: "Sunset Chill", artistId: "artist-5", album: "Golden Hour", duration: "4:00", plays: 52000000, cover: "", releaseYear: 2024 },
+      { id: "track-11", title: "Dancefloor Heaven", artistId: "artist-1", album: "Party Mode", duration: "3:32", plays: 87000000, cover: "", releaseYear: 2023 },
+      { id: "track-12", title: "Moonbeam", artistId: "artist-4", album: "Lunar Tides", duration: "3:50", plays: 76000000, cover: "", releaseYear: 2024 },
+      { id: "track-13", title: "Horizon", artistId: "artist-8", album: "Skyline", duration: "3:25", plays: 112000000, cover: "", releaseYear: 2022 },
+      { id: "track-14", title: "Ocean Whisper", artistId: "artist-6", album: "Silk Waves", duration: "4:14", plays: 31000000, cover: "", releaseYear: 2023 },
+      { id: "track-15", title: "Digital Heart", artistId: "artist-2", album: "Neon Nights", duration: "3:40", plays: 45000000, cover: "", releaseYear: 2025 },
     ],
     settings: {
       passThreshold: 60,
@@ -77,6 +93,8 @@
     if (!Array.isArray(db.attendance)) db.attendance = [];
     if (!Array.isArray(db.artists)) db.artists = [];
     if (!Array.isArray(db.tracks)) db.tracks = [];
+    if (db.artists.length === 0) db.artists = defaultDB().artists;
+    if (db.tracks.length === 0) db.tracks = defaultDB().tracks;
     if (Array.isArray(db.users)) {
       db.users.forEach((u) => {
         if (!SUPPORTED_THEMES.includes(u.theme)) u.theme = DEFAULT_THEME;
@@ -164,6 +182,123 @@
       .slice()
       .sort((a, b) => (b.releaseYear || 0) - (a.releaseYear || 0))
       .slice(0, limit);
+  }
+
+  function normalizeSearchQuery(query) {
+    return String(query || "").trim().toLowerCase();
+  }
+
+  function searchCatalog(db, query) {
+    const q = normalizeSearchQuery(query);
+    if (!q) return { tracks: [], artists: [] };
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const artistById = new Map(db.artists.map((artist) => [artist.id, artist]));
+
+    const tracks = db.tracks
+      .map((track) => {
+        const artist = artistById.get(track.artistId);
+        const title = String(track.title || "").toLowerCase();
+        const album = String(track.album || "").toLowerCase();
+        const genre = String(artist?.genre || "").toLowerCase();
+        const artistName = String(artist?.name || "").toLowerCase();
+        const haystack = `${title} ${album} ${artistName} ${genre} ${track.releaseYear || ""}`;
+        let score = 0;
+        for (const term of tokens) {
+          if (title.includes(term)) score += 5;
+          if (artistName.includes(term)) score += 4;
+          if (album.includes(term)) score += 3;
+          if (genre.includes(term)) score += 2;
+          if (String(track.releaseYear || "").includes(term)) score += 1;
+          if (haystack.includes(term)) score += 1;
+        }
+        return { track, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || b.track.plays - a.track.plays)
+      .map((item) => item.track);
+
+    const artists = db.artists
+      .map((artist) => {
+        const name = String(artist.name || "").toLowerCase();
+        const genre = String(artist.genre || "").toLowerCase();
+        const haystack = `${name} ${genre}`;
+        let score = 0;
+        for (const term of tokens) {
+          if (name.includes(term)) score += 5;
+          if (genre.includes(term)) score += 3;
+          if (haystack.includes(term)) score += 1;
+        }
+        return { artist, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || b.artist.followers - a.artist.followers)
+      .map((item) => item.artist);
+
+    return { tracks, artists };
+  }
+
+  function renderSearchResults(db, query) {
+    const results = searchCatalog(db, query);
+    elApp.innerHTML = `
+      <div class="card">
+        <div class="row" style="margin-bottom:14px; gap:16px; align-items:flex-end;">
+          <div>
+            <h2 class="section-title">Результати пошуку</h2>
+            <div class="muted" style="margin-top:6px;">Пошук за запитом: «${escapeHtml(query)}»</div>
+          </div>
+          <div><span class="pill pill--accent">${escapeHtml(String(results.tracks.length + results.artists.length))} знайдено</span></div>
+        </div>
+      </div>
+
+      <div class="grid grid--2" style="gap:18px; align-items:start;">
+        <div class="card">
+          <div class="section-title">Треки</div>
+          ${results.tracks.length
+            ? `<div class="track-list">
+                ${results.tracks
+                  .slice(0, 10)
+                  .map(
+                    (track, index) => `
+                      <div class="track-row">
+                        <div class="track-row__info">
+                          <div class="track-row__index">${String(index + 1).padStart(2, "0")}</div>
+                          <div>
+                            <div class="track-row__title">${escapeHtml(track.title)}</div>
+                            <div class="track-row__meta">${escapeHtml(getArtistById(db, track.artistId)?.name || "Артист")} • ${escapeHtml(track.album)}</div>
+                          </div>
+                        </div>
+                        <div class="track-row__meta">${escapeHtml(track.duration)}</div>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>`
+            : `<div class="notice notice--danger">Треків не знайдено. Спробуйте інший запит.</div>`}
+        </div>
+
+        <div class="card">
+          <div class="section-title">Артисти</div>
+          ${results.artists.length
+            ? `<div class="artist-list">
+                ${results.artists
+                  .slice(0, 10)
+                  .map(
+                    (artist) => `
+                      <div class="artist-item">
+                        <div class="artist-item__avatar"></div>
+                        <div class="artist-item__info">
+                          <div class="artist-item__name">${escapeHtml(artist.name)}</div>
+                          <div class="artist-item__stats">${Number(artist.followers).toLocaleString()} підписників • ${Number(artist.plays).toLocaleString()} прослуховувань</div>
+                        </div>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>`
+            : `<div class="notice notice--danger">Артистів не знайдено. Спробуйте інший запит.</div>`}
+        </div>
+      </div>
+    `;
   }
 
   function formatDuration(duration) {
@@ -1949,6 +2084,25 @@
   window.addEventListener("hashchange", () => render());
   // Initial render
   render();
+
+  function attachSearchHandlers() {
+    const searchInput = document.getElementById("siteSearch") || document.querySelector(".topbar__search input");
+    if (!searchInput) return;
+    const handleSearch = () => {
+      const query = String(searchInput.value || "").trim();
+      if (!query) {
+        render();
+        return;
+      }
+      const db = loadDB();
+      renderSearchResults(db, query);
+    };
+
+    searchInput.addEventListener("input", handleSearch);
+    searchInput.addEventListener("search", handleSearch);
+  }
+
+  attachSearchHandlers();
 
   // Лог помилок у консоль, щоб було видно причину “не працює кнопка”.
   window.addEventListener("error", (e) => {
