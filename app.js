@@ -261,7 +261,13 @@
   }
 
   function currentRoute() {
-    const h = (location.hash || "#/").replace(/^#/, "");
+    let hash = String(location.hash || "#/");
+    try {
+      hash = decodeURIComponent(hash);
+    } catch {
+      // ignore malformed encoding
+    }
+    const h = hash.replace(/^#/, "");
     const route = h.startsWith("/") ? h : `/${h}`;
     return route;
   }
