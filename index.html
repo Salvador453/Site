@@ -8,31 +8,45 @@
   </head>
   <body>
     <div class="bg" aria-hidden="true"></div>
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand__logo" aria-hidden="true">◉</div>
-        <div class="brand__text">
-          <div class="brand__title">Студентська платформа</div>
-          <div class="brand__subtitle">Статистика, відвідуваність та успішність</div>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar__brand">
+          <div class="brand__logo" aria-hidden="true">◉</div>
+          <div>
+            <div class="brand__title">Студентська платформа</div>
+            <div class="brand__subtitle">Статистика та успішність</div>
+          </div>
         </div>
+
+        <nav class="sidebar__nav">
+          <a href="#/" class="sidebar__link" data-nav>Головна</a>
+          <a href="#/кабінет" class="sidebar__link" data-nav>Кабінет</a>
+          <a href="#/профіль" class="sidebar__link sidebar__link--hidden nav__link--profile" data-nav>Профіль</a>
+          <a href="#/староста" class="sidebar__link sidebar__link--hidden nav__link--starosta" data-nav>Староста</a>
+          <a href="#/адмін" class="sidebar__link sidebar__link--admin" data-nav>Адмін-панель</a>
+        </nav>
+
+        <div class="sidebar__section">
+          <div class="section-title">Мої дані</div>
+          <div id="userBadge" class="sidebar__user user-badge" role="status" aria-live="polite"></div>
+        </div>
+      </aside>
+
+      <div class="page-wrapper">
+        <header class="topbar">
+          <div class="topbar__search">
+            <input type="search" placeholder="Пошук..." aria-label="Пошук" />
+          </div>
+          <div class="topbar__actions">
+            <button class="btn btn--primary">Explore Now</button>
+          </div>
+        </header>
+
+        <main class="container">
+          <section id="app" class="app"></section>
+        </main>
       </div>
-
-      <nav class="nav">
-        <a href="#/" class="nav__link" data-nav>Головна</a>
-        <a href="#/кабінет" class="nav__link" data-nav>Кабінет</a>
-        <a href="#/профіль" class="nav__link nav__link--profile" data-nav style="display:none;">Профіль</a>
-        <a href="#/староста" class="nav__link nav__link--starosta" data-nav style="display:none;">Староста</a>
-        <a href="#/адмін" class="nav__link nav__link--admin" data-nav>Адмін-панель</a>
-      </nav>
-
-      <div class="authbar">
-        <div id="userBadge" class="user-badge" role="status" aria-live="polite"></div>
-      </div>
-    </header>
-
-    <main class="container">
-      <section id="app" class="app"></section>
-    </main>
+    </div>
 
     <footer class="footer">
       <div>Дані зберігаються локально у браузері (для демо/тесту без сервера).</div>
