@@ -2282,6 +2282,7 @@
   }
 
   attachSearchHandlers();
+  attachTrackClickHandlers();
 
   // Лог помилок у консоль, щоб було видно причину “не працює кнопка”.
   window.addEventListener("error", (e) => {
