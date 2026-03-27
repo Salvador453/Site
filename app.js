@@ -19,51 +19,204 @@
     });
 
   const $ = (sel, root = document) => root.querySelector(sel);
+  let nowPlayingTrackId = null;
 
-  const defaultDB = () => ({
-    version: 1,
-    users: [],
-    groups: COURSES.map((c) => ({
-      id: `group-${c}`,
-      courseId: c,
-      name: "",
-    })),
-    subjects: [],
-    grades: [], // {id, studentId, subjectId, score, dateISO}
-    attendance: [], // {id, courseId, dateISO, studentId, present}
-    artists: [
-      { id: "artist-1", name: "Mamank", followers: 1928, plays: 122000000, genre: "Dance Beat" },
-      { id: "artist-2", name: "Maimunah", followers: 1980, plays: 54000000, genre: "Electro Pop" },
-      { id: "artist-3", name: "Pajio", followers: 1520, plays: 32000000, genre: "Pop" },
-      { id: "artist-4", name: "NovaWave", followers: 8820, plays: 93000000, genre: "Synthwave" },
-      { id: "artist-5", name: "Solaris", followers: 7600, plays: 68000000, genre: "Chillout" },
-      { id: "artist-6", name: "Velvet Drift", followers: 4300, plays: 25000000, genre: "Lounge" },
-      { id: "artist-7", name: "Midnight Echo", followers: 3150, plays: 41000000, genre: "Ambient" },
-      { id: "artist-8", name: "Pulse Six", followers: 11400, plays: 145000000, genre: "House" },
-    ],
-    tracks: [
-      { id: "track-1", title: "Balonku Ada 5 Meter", artistId: "artist-1", album: "Studio Vibes", duration: "3:20", plays: 122000000, cover: "", releaseYear: 2025 },
-      { id: "track-2", title: "Kucing Kesayangan", artistId: "artist-2", album: "Neon Nights", duration: "3:20", plays: 50000000, cover: "", releaseYear: 2025 },
-      { id: "track-3", title: "Pajio", artistId: "artist-3", album: "City Lights", duration: "3:30", plays: 22000000, cover: "", releaseYear: 2025 },
-      { id: "track-4", title: "Lofi Bass", artistId: "artist-3", album: "Relaxed Sessions", duration: "3:05", plays: 18000000, cover: "", releaseYear: 2024 },
-      { id: "track-5", title: "Night Drive", artistId: "artist-4", album: "Midnight Cruise", duration: "4:02", plays: 93000000, cover: "", releaseYear: 2025 },
-      { id: "track-6", title: "Starlight", artistId: "artist-5", album: "Sunset Chill", duration: "3:45", plays: 68000000, cover: "", releaseYear: 2024 },
-      { id: "track-7", title: "Velvet Skies", artistId: "artist-6", album: "Afterglow", duration: "3:55", plays: 25000000, cover: "", releaseYear: 2023 },
-      { id: "track-8", title: "Echoes", artistId: "artist-7", album: "Dreamscape", duration: "4:18", plays: 41000000, cover: "", releaseYear: 2024 },
-      { id: "track-9", title: "Neon Pulse", artistId: "artist-8", album: "Club Motion", duration: "3:10", plays: 145000000, cover: "", releaseYear: 2025 },
-      { id: "track-10", title: "Sunset Chill", artistId: "artist-5", album: "Golden Hour", duration: "4:00", plays: 52000000, cover: "", releaseYear: 2024 },
-      { id: "track-11", title: "Dancefloor Heaven", artistId: "artist-1", album: "Party Mode", duration: "3:32", plays: 87000000, cover: "", releaseYear: 2023 },
-      { id: "track-12", title: "Moonbeam", artistId: "artist-4", album: "Lunar Tides", duration: "3:50", plays: 76000000, cover: "", releaseYear: 2024 },
-      { id: "track-13", title: "Horizon", artistId: "artist-8", album: "Skyline", duration: "3:25", plays: 112000000, cover: "", releaseYear: 2022 },
-      { id: "track-14", title: "Ocean Whisper", artistId: "artist-6", album: "Silk Waves", duration: "4:14", plays: 31000000, cover: "", releaseYear: 2023 },
-      { id: "track-15", title: "Digital Heart", artistId: "artist-2", album: "Neon Nights", duration: "3:40", plays: 45000000, cover: "", releaseYear: 2025 },
-    ],
-    settings: {
-      passThreshold: 60,
-      telegramBotToken: "",
-      telegramChatId: "",
-    },
-  });
+  function normalizeText(text) {
+    return String(text || "")
+      .trim()
+      .toLowerCase()
+      .replace(/ё/g, "е")
+      .replace(/[^а-яa-z0-9\s]/gi, " ")
+      .replace(/\s+/g, " ");
+  }
+
+  function levenshteinDistance(source, target, maxDistance = 2) {
+    const a = String(source || "");
+    const b = String(target || "");
+    if (a === b) return 0;
+    const m = a.length;
+    const n = b.length;
+    if (Math.abs(m - n) > maxDistance) return maxDistance + 1;
+    const row = new Array(n + 1);
+    for (let j = 0; j <= n; j += 1) row[j] = j;
+    for (let i = 1; i <= m; i += 1) {
+      let prev = row[0];
+      row[0] = i;
+      for (let j = 1; j <= n; j += 1) {
+        const cur = row[j];
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+        prev = cur;
+      }
+      if (Math.min(...row) > maxDistance) return maxDistance + 1;
+    }
+    return row[n];
+  }
+
+  function isGenericSearchToken(token) {
+    const generic = ["трек", "треки", "трейк", "песня", "песни", "плейлист", "плейлисты", "музыка", "музыке", "музыкальный", "музыкальная"];
+    return generic.includes(token);
+  }
+
+  function createMusicCatalog() {
+    const artistNames = [
+      "Летний Ветер",
+      "Ночной Драйв",
+      "Солнечный Ритм",
+      "Городской Шум",
+      "Тихий Залив",
+      "Снежная Дюна",
+      "Электро Пульс",
+      "Звёздный Свет",
+      "Серебряная Волна",
+      "Вечерний Рейн",
+      "Сумеречный Город",
+      "Пульс Ночи",
+      "Морозный Ветер",
+      "Лунная Тропа",
+      "Космическая Лабиринт",
+      "Тёплый Лист",
+      "Рассветный Залив",
+      "Танцующий Дождь",
+      "Ритмы Города",
+      "Сказочный Шум",
+      "Небесный Поток",
+      "Магнитный Басс",
+      "Ритмическая Ночь",
+      "Глубокий Драйв",
+      "Шум Волны",
+      "Пурпурный Закат",
+      "Звёздный Берег",
+      "Свободный Пульс",
+      "Хрустальный Город",
+      "Лёд и Пламя",
+    ];
+    const albumNames = [
+      "Ночные Огни",
+      "Летний Бриз",
+      "Серебряные Ноты",
+      "Городская Сцена",
+      "Звуки Заката",
+      "Пульс Метрополиса",
+      "Космический Драйв",
+      "Тихий Поток",
+      "Ритмы Улиц",
+      "Лунная Симфония",
+      "Морская Глубина",
+      "Пески Времени",
+      "Снежная Сага",
+      "Вечерний Ультрафиолет",
+      "Звёздный Путь",
+    ];
+    const adjectives = [
+      "Летний",
+      "Ночной",
+      "Тёплый",
+      "Серебряный",
+      "Звёздный",
+      "Тихий",
+      "Электро",
+      "Солнечный",
+      "Морозный",
+      "Лунный",
+      "Городской",
+      "Пурпурный",
+      "Хрустальный",
+      "Вечерний",
+      "Пыльный",
+      "Свежий",
+      "Магнитный",
+      "Глубокий",
+      "Быстрый",
+      "Мелодичный",
+    ];
+    const nouns = [
+      "Ветер",
+      "Дождь",
+      "Ритм",
+      "Ночь",
+      "Город",
+      "Шум",
+      "Волна",
+      "Поток",
+      "Закат",
+      "Пульс",
+      "Свет",
+      "Лист",
+      "Море",
+      "Снег",
+      "Лабиринт",
+      "Магия",
+      "Сон",
+      "Полет",
+      "Звезда",
+      "Линия",
+      "Драйв",
+      "Дыхание",
+      "Полет",
+      "Огонь",
+      "Тень",
+      "Мелодия",
+      "Гармония",
+      "Шаг",
+      "Сказка",
+      "Рассвет",
+    ];
+    const durations = ["2:48", "3:12", "3:25", "3:40", "4:02", "4:18", "3:05", "2:55", "3:33", "4:10"];
+    const genres = ["Ambient", "Chill", "House", "Synthwave", "Pop", "Electro", "Lounge", "Downtempo", "Dream Pop", "Future Bass"];
+
+    const artists = artistNames.map((name, index) => ({
+      id: `artist-${index + 1}`,
+      name,
+      followers: 40000 + index * 3200 + (index % 5) * 1500,
+      plays: 18000000 + index * 720000 + (index % 4) * 430000,
+      genre: genres[index % genres.length],
+    }));
+
+    const tracks = Array.from({ length: 1200 }, (_, index) => {
+      const artist = artists[index % artists.length];
+      const title = `${adjectives[index % adjectives.length]} ${nouns[(index + Math.floor(index / 5)) % nouns.length]}`;
+      const album = albumNames[index % albumNames.length];
+      const duration = durations[index % durations.length];
+      const year = 2022 + ((index + 3) % 4);
+      const plays = 1600000 + ((index * 37) % 99000000);
+      return {
+        id: `track-${index + 1}`,
+        title: `${title}`,
+        artistId: artist.id,
+        album,
+        duration,
+        plays,
+        cover: "",
+        releaseYear: year,
+      };
+    });
+
+    return { artists, tracks };
+  }
+
+  const defaultDB = () => {
+    const catalog = createMusicCatalog();
+    return {
+      version: 1,
+      users: [],
+      groups: COURSES.map((c) => ({
+        id: `group-${c}`,
+        courseId: c,
+        name: "",
+      })),
+      subjects: [],
+      grades: [], // {id, studentId, subjectId, score, dateISO}
+      attendance: [], // {id, courseId, dateISO, studentId, present}
+      artists: catalog.artists,
+      tracks: catalog.tracks,
+      settings: {
+        passThreshold: 60,
+        telegramBotToken: "",
+        telegramChatId: "",
+      },
+    };
+  };
 
   function loadDB() {
     const raw = localStorage.getItem(DB_KEY);
@@ -167,6 +320,32 @@
 
   function getArtistById(db, id) {
     return db.artists.find((artist) => artist.id === id) || null;
+  }
+
+  function updatePlayerBar(track, db) {
+    if (!track) return;
+    const titleEl = document.querySelector(".player-bar__title");
+    const artistEl = document.querySelector(".player-bar__artist");
+    if (titleEl) titleEl.textContent = track.title;
+    if (artistEl) titleEl.textContent = getArtistById(db, track.artistId)?.name || "";
+  }
+
+  function setNowPlaying(db, trackId) {
+    const track = db.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+    nowPlayingTrackId = track.id;
+    updatePlayerBar(track, db);
+  }
+
+  function attachTrackClickHandlers() {
+    elApp.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-track-id]");
+      if (!target) return;
+      const trackId = target.getAttribute("data-track-id");
+      if (!trackId) return;
+      const db = loadDB();
+      setNowPlaying(db, trackId);
+    });
   }
 
   function getTopTracks(db, limit = 3) {
